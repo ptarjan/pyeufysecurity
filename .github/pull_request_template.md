@@ -2,7 +2,7 @@
 
 **Does this fix a specific issue?**
 
-Fixes https://github.com/bachya/python-eufy-security/issues/<ISSUE ID>
+Fixes https://github.com/ptarjan/pyeufysecurity/issues/<ISSUE ID>
   
 **Checklist:**
 

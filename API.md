@@ -1,4 +1,4 @@
-# python-eufy-security
+# pyeufysecurity
 Python library for Eufy Security cameras
 
 # API Calls/Documentation

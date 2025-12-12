@@ -1,9 +1,9 @@
-# python-eufy-security
+# pyeufysecurity
 
 [![CI](https://github.com/ptarjan/pyeufysecurity/workflows/CI/badge.svg)](https://github.com/ptarjan/pyeufysecurity/actions)
-[![PyPi](https://img.shields.io/pypi/v/python-eufy-security.svg)](https://pypi.python.org/pypi/python-eufy-security)
-[![Version](https://img.shields.io/pypi/pyversions/python-eufy-security.svg)](https://pypi.python.org/pypi/python-eufy-security)
-[![License](https://img.shields.io/pypi/l/python-eufy-security.svg)](https://github.com/ptarjan/pyeufysecurity/blob/dev/LICENSE)
+[![PyPi](https://img.shields.io/pypi/v/pyeufysecurity.svg)](https://pypi.python.org/pypi/pyeufysecurity)
+[![Version](https://img.shields.io/pypi/pyversions/pyeufysecurity.svg)](https://pypi.python.org/pypi/pyeufysecurity)
+[![License](https://img.shields.io/pypi/l/pyeufysecurity.svg)](https://github.com/ptarjan/pyeufysecurity/blob/dev/LICENSE)
 
 A Python library for Eufy Security cameras and devices.
 
@@ -20,7 +20,7 @@ The library is currently supported on:
 ## Installation
 
 ```bash
-pip install python-eufy-security
+pip install pyeufysecurity
 ```
 
 ## Account Information
