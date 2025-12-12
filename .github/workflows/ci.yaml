@@ -21,73 +21,46 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - "3.6"
-          - "3.7"
-          - "3.8"
+          - "3.11"
+          - "3.12"
+          - "3.13"
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - run: |
-          python -m pip install --upgrade pip poetry
-          poetry install
-          poetry run pytest tests/
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" || pip install -e .
+          pip install pytest pytest-cov pytest-asyncio aiohttp
 
-  coverage:
-
-    name: Test Coverage
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions/setup-python@v2
-        with:
-          python-version: "3.x"
-
-      - run: |
-          python -m pip install --upgrade pip poetry
-          poetry install
-          poetry run pytest \
-            -s \
-            --verbose \
-            --cov-report term-missing \
-            --cov-report xml \
-            --cov=eufy_security tests
-
-      - uses: codecov/codecov-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Run tests
+        run: pytest tests/ -v
 
   lint:
-
-    name: "Linting & Static Analysis"
+    name: "Linting & Type Checking"
 
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
-      - id: version
-        run: echo "::set-output name=sha::$(python -VV | sha256sum | cut -d' ' -f1)"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install ruff mypy
 
-      - uses: actions/cache@v1
-        with:
-          path: ~/.cache/pre-commit
-          key: >
-            pre-commit|${{ steps.version.outputs.sha }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Run ruff
+        run: ruff check .
 
-      - run: |
-          python -m pip install --upgrade pip poetry
-          poetry install
-          poetry run pre-commit install-hooks
-          poetry run pre-commit run --all-files
+      - name: Run mypy
+        run: mypy eufy_security --ignore-missing-imports
