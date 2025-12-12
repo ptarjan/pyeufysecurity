@@ -1,9 +1,13 @@
 """Define tests for the API module."""
 
-from unittest.mock import MagicMock
+from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from eufy_security.api import API, DEFAULT_HEADERS, SERVER_PUBLIC_KEY
 from eufy_security.device import Camera
+from eufy_security.errors import EufySecurityError
 
 from .common import TEST_EMAIL, TEST_PASSWORD, load_json_fixture
 
@@ -160,3 +164,209 @@ class TestStreamResponses:
         """Test stop stream response is success."""
         fixture = load_json_fixture("stop_stream_response.json")
         assert fixture["code"] == 0
+
+
+class TestAPIProperties:
+    """Tests for API property accessors."""
+
+    def test_token_property(self):
+        """Test token property."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        assert api.token is None
+
+        api._token = "test-token"
+        assert api.token == "test-token"
+
+    def test_token_expiration_property(self):
+        """Test token_expiration property."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        assert api.token_expiration is None
+
+        expiration = datetime.now() + timedelta(days=1)
+        api._token_expiration = expiration
+        assert api.token_expiration == expiration
+
+    def test_api_base_property(self):
+        """Test api_base property."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        assert api.api_base is None
+
+        api._api_base = "https://api.eufy.com"
+        assert api.api_base == "https://api.eufy.com"
+
+    def test_set_token(self):
+        """Test set_token method."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        expiration = datetime.now() + timedelta(days=1)
+        api.set_token("my-token", expiration, "https://api.eufy.com")
+
+        assert api.token == "my-token"
+        assert api.token_expiration == expiration
+        assert api.api_base == "https://api.eufy.com"
+
+
+class TestAPICryptoState:
+    """Tests for API crypto state serialization."""
+
+    def test_get_crypto_state(self):
+        """Test getting crypto state for serialization."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        crypto_state = api.get_crypto_state()
+
+        assert "private_key" in crypto_state
+        assert "server_public_key" in crypto_state
+        # Private key should be hex-encoded
+        assert len(crypto_state["private_key"]) > 0
+        # Server public key is empty initially
+        assert crypto_state["server_public_key"] == ""
+
+    def test_restore_crypto_state_empty_keys(self):
+        """Test restore_crypto_state returns False for empty keys."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        assert api.restore_crypto_state("", "") is False
+        assert api.restore_crypto_state("abc", "") is False
+        assert api.restore_crypto_state("", "abc") is False
+
+    def test_restore_crypto_state_invalid_keys(self):
+        """Test restore_crypto_state returns False for invalid keys."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        # Invalid hex
+        assert api.restore_crypto_state("not-hex", "also-not-hex") is False
+
+        # Valid hex but invalid key format
+        assert api.restore_crypto_state("abcd", "1234") is False
+
+    def test_restore_crypto_state_valid_keys(self):
+        """Test restore_crypto_state works with valid keys."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        # Get current crypto state
+        original_state = api.get_crypto_state()
+        private_key_hex = original_state["private_key"]
+
+        # Use the hardcoded server public key
+        server_public_key_hex = SERVER_PUBLIC_KEY.hex()
+
+        # Restore with valid keys
+        result = api.restore_crypto_state(private_key_hex, server_public_key_hex)
+
+        assert result is True
+
+
+class TestCameraStreaming:
+    """Tests for Camera streaming methods."""
+
+    @pytest.mark.asyncio
+    async def test_start_stream_local_rtsp(self):
+        """Test starting stream with local RTSP credentials."""
+        api = MagicMock()
+        camera = Camera(
+            api=api,
+            camera_info={"ip_addr": "192.168.1.100", "device_sn": "ABC", "station_sn": "XYZ"},
+            rtsp_username="admin",
+            rtsp_password="secret123",
+        )
+
+        url = await camera.async_start_stream()
+
+        assert url == "rtsp://admin:secret123@192.168.1.100:554/live0"
+
+    @pytest.mark.asyncio
+    async def test_start_stream_url_encodes_credentials(self):
+        """Test that RTSP credentials are URL-encoded."""
+        api = MagicMock()
+        camera = Camera(
+            api=api,
+            camera_info={"ip_addr": "192.168.1.100", "device_sn": "ABC", "station_sn": "XYZ"},
+            rtsp_username="user@home",
+            rtsp_password="pass:word/test",
+        )
+
+        url = await camera.async_start_stream()
+
+        # Special characters should be URL-encoded
+        assert "user%40home" in url
+        assert "pass%3Aword%2Ftest" in url
+
+    @pytest.mark.asyncio
+    async def test_start_stream_cloud_fallback(self):
+        """Test fallback to cloud streaming when no RTSP credentials."""
+        api = MagicMock()
+        api.request = AsyncMock(return_value={"data": {"url": "rtsp://cloud.eufy.com/stream"}})
+
+        camera = Camera(
+            api=api,
+            camera_info={"device_sn": "ABC", "station_sn": "XYZ"},
+        )
+
+        url = await camera.async_start_stream()
+
+        assert url == "rtsp://cloud.eufy.com/stream"
+        api.request.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_start_stream_cloud_failure(self):
+        """Test handling of cloud stream failure."""
+        api = MagicMock()
+        api.request = AsyncMock(side_effect=EufySecurityError("API error"))
+
+        camera = Camera(
+            api=api,
+            camera_info={"device_sn": "ABC", "station_sn": "XYZ"},
+        )
+
+        url = await camera.async_start_stream()
+
+        assert url is None
+
+    @pytest.mark.asyncio
+    async def test_stop_stream(self):
+        """Test stopping camera stream."""
+        api = MagicMock()
+        api.request = AsyncMock()
+
+        camera = Camera(
+            api=api,
+            camera_info={"device_sn": "ABC123", "station_sn": "XYZ789"},
+        )
+
+        await camera.async_stop_stream()
+
+        api.request.assert_called_once_with(
+            "post",
+            "v1/web/equipment/stop_stream",
+            json={
+                "device_sn": "ABC123",
+                "station_sn": "XYZ789",
+                "proto": 2,
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_stop_stream_failure_handled(self):
+        """Test that stop stream failure is handled gracefully."""
+        api = MagicMock()
+        api.request = AsyncMock(side_effect=EufySecurityError("API error"))
+
+        camera = Camera(
+            api=api,
+            camera_info={"device_sn": "ABC", "station_sn": "XYZ"},
+        )
+
+        # Should not raise, just log warning
+        await camera.async_stop_stream()
