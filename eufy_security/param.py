@@ -24,8 +24,8 @@ class Param:
         except ValueError as err:
             _LOGGER.debug(
                 'Unable to process parameter "%s", value "%s"',
-                param_info["param_type"],
-                param_info["param_value"],
+                param_info["param_type"],  # type: ignore[index]
+                param_info["param_value"],  # type: ignore[index]
             )
             raise err
 
@@ -102,7 +102,7 @@ class Params(list):
 
         return False
 
-    def __getitem__(self, key: Any) -> Param:
+    def __getitem__(self, key: Any) -> Param:  # type: ignore[override]
         """Return the param for the given param type."""
         try:
             param_type = ParamType.lookup(key)

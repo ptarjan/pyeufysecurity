@@ -115,5 +115,5 @@ class EnumConverter:
     def dumps(self, value: Enum) -> Any:
         """Return the value for the given enum."""
         if not isinstance(value, self._enum):
-            value = self._enum[value]
+            value = self._enum[value]  # type: ignore[index]
         return value.value
