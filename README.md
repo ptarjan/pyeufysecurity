@@ -7,7 +7,7 @@
 
 A Python library for Eufy Security cameras and devices.
 
-Based on [eufy-security-client](https://github.com/bropat/eufy-security-client) by bropat.
+Based on [python-eufy-security](https://github.com/FuzzyMistborn/python-eufy-security) by FuzzyMistborn and [eufy-security-client](https://github.com/bropat/eufy-security-client) by bropat.
 
 ## Python Versions
 
