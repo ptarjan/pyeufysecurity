@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import logging
-from typing import Any
+from typing import Any, SupportsIndex, overload
 
 from .types import ParamType
 
@@ -15,21 +15,21 @@ class Param:
 
     def __init__(self, param_info: dict[str, Any] | ParamType) -> None:
         """Initialise the param."""
-        try:
-            self._value = None
-            if isinstance(param_info, ParamType):
-                self.type = param_info
-                self.param_info = {}
-            else:
+        self._value: Any = None
+        if isinstance(param_info, ParamType):
+            self.type = param_info
+            self.param_info: dict[str, Any] = {}
+        else:
+            try:
                 self.type = ParamType(param_info["param_type"])
                 self.param_info = param_info.copy()
-        except ValueError as err:
-            _LOGGER.debug(
-                'Unable to process parameter "%s", value "%s"',
-                param_info["param_type"],  # type: ignore[index]
-                param_info["param_value"],  # type: ignore[index]
-            )
-            raise err
+            except ValueError as err:
+                _LOGGER.debug(
+                    'Unable to process parameter "%s", value "%s"',
+                    param_info["param_type"],
+                    param_info["param_value"],
+                )
+                raise err
 
     def __eq__(self, other: Any) -> bool:
         """Check whether the other object equals this object."""
@@ -104,15 +104,29 @@ class Params(list[Param]):
 
         return False
 
-    def __getitem__(self, key: Any) -> Param:  # type: ignore[override]
-        """Return the param for the given param type."""
-        try:
-            param_type = ParamType.lookup(key)
-            for param in self:
-                if param.type == param_type:
-                    return param
-        except ValueError:
-            pass
+    @overload
+    def __getitem__(self, key: SupportsIndex) -> Param: ...
+    @overload
+    def __getitem__(self, key: slice) -> list[Param]: ...
+    @overload
+    def __getitem__(self, key: ParamType | str) -> Param: ...
+
+    def __getitem__(
+        self, key: SupportsIndex | slice | ParamType | str
+    ) -> Param | list[Param]:
+        """Return the param for the given param type or index."""
+        # Handle slices directly via list indexing
+        if isinstance(key, slice):
+            return super().__getitem__(key)
+        # All other keys (ParamType, str, int) go through ParamType lookup
+        if isinstance(key, (ParamType, str, int)):
+            try:
+                param_type = ParamType.lookup(key)
+                for param in self:
+                    if param.type == param_type:
+                        return param
+            except ValueError:
+                pass
         raise KeyError(key)
 
     def __setitem__(self, param_type: Any, value: Any) -> None:

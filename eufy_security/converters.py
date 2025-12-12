@@ -129,8 +129,10 @@ class EnumConverter:
         """Return the enum for the given value."""
         return self._enum(value)
 
-    def dumps(self, value: Enum) -> Any:
+    def dumps(self, value: Enum | str) -> Any:
         """Return the value for the given enum."""
-        if not isinstance(value, self._enum):
-            value = self._enum[value]  # type: ignore[index]
+        if isinstance(value, str):
+            # Look up enum member by name
+            member: Enum = getattr(self._enum, value)
+            return member.value
         return value.value
