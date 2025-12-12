@@ -61,8 +61,8 @@ def test_param_status():
     """Returns the param status."""
     param1 = Param({"param_type": ParamType.CHIME_STATE.value, "status": 1,})
     param2 = Param({"param_type": ParamType.CHIME_STATE.value, "status": 0,})
-    assert param1.status == True
-    assert param2.status == False
+    assert param1.status is True
+    assert param2.status is False
 
 
 def test_param_value():
@@ -173,7 +173,7 @@ def test_params_items():
         ]
     )
     items = params.items()
-    assert type(items) == dict
+    assert isinstance(items, dict)
     assert len(items) == 2
 
 

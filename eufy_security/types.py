@@ -144,7 +144,7 @@ class ParamType(Enum):
         """Look up a param type by its number or name."""
         if isinstance(name_or_value, ParamType):
             return name_or_value
-        if type(name_or_value) == str:
+        if isinstance(name_or_value, str):
             return ParamType[name_or_value]
         else:
             return ParamType(name_or_value)

@@ -3,9 +3,15 @@
 from datetime import datetime, timezone
 from enum import Enum
 
-import pytest
-
-from eufy_security.converters import *
+from eufy_security.converters import (
+    BoolConverter,
+    DatetimeConverter,
+    EnumConverter,
+    JsonBase64Converter,
+    JsonConverter,
+    NumberConverter,
+    StringConverter,
+)
 
 
 def test_string_loads():
@@ -34,8 +40,8 @@ def test_number_dumps():
 
 def test_boolean_loads():
     """Test loading data as a boolean."""
-    assert BoolConverter.loads("1") == True
-    assert BoolConverter.loads("0") == False
+    assert BoolConverter.loads("1") is True
+    assert BoolConverter.loads("0") is False
 
 
 def test_boolean_dumps():
@@ -47,7 +53,7 @@ def test_boolean_dumps():
 def test_json_loads():
     """Test loading json-encoded data as an object."""
     assert JsonConverter.loads('{"a": 1}') == {"a": 1}
-    assert JsonConverter.loads("") == None
+    assert JsonConverter.loads("") is None
 
 
 def test_json_dumps():
