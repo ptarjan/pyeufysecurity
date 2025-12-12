@@ -1,7 +1,9 @@
 """Define a Eufy parameter object."""
+from __future__ import annotations
+
 from datetime import datetime, timezone
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from .types import ParamType
 
@@ -11,7 +13,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 class Param:
     """Define a param object."""
 
-    def __init__(self, param_info: Union[Dict[str, Any], ParamType]) -> None:
+    def __init__(self, param_info: dict[str, Any] | ParamType) -> None:
         """Initialise the param."""
         try:
             self._value = None
@@ -43,7 +45,7 @@ class Param:
     @property
     def id(self) -> int:
         """Return the param id."""
-        return self.param_info["param_id"]
+        return int(self.param_info["param_id"])
 
     @property
     def status(self) -> bool:
@@ -73,13 +75,13 @@ class Param:
         return datetime.fromtimestamp(self.param_info["update_time"], timezone.utc)
 
 
-class Params(list):
+class Params(list[Param]):
     """Define a dictionary of parameters."""
 
-    def __init__(self, param_infos: List[Dict[str, Any]] = []):
+    def __init__(self, param_infos: list[dict[str, Any]] | None = None) -> None:
         """Initialise params."""
-        params = []
-        for param_info in param_infos:
+        params: list[Param] = []
+        for param_info in param_infos or []:
             try:
                 params.append(Param(param_info))
             except ValueError:
@@ -123,11 +125,11 @@ class Params(list):
             self.append(param)
         param.set_value(value)
 
-    def items(self) -> Dict[ParamType, Param]:
+    def items(self) -> dict[ParamType, Param]:
         """Return a dictionary of params."""
         return {param.type: param for param in self}
 
-    def update(self, data: Dict[str, Any]) -> None:
+    def update(self, data: dict[str, Any]) -> None:
         """Update the params with the provided dictionary."""
         for param_type, value in data.items():
             self[param_type] = value

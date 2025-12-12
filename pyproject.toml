@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyeufysecurity"
-version = "0.4.1"
+version = "0.4.2"
 description = "A Python library for Eufy Security cameras and devices"
 readme = "README.md"
 license = "MIT"

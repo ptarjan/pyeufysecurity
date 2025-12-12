@@ -1,9 +1,26 @@
 """Define converters."""
+from __future__ import annotations
+
 import base64
 from datetime import datetime, timezone
 from enum import Enum
 import json
-from typing import Any, Type, Union
+from typing import Any, Protocol, Type, Union, runtime_checkable
+
+
+@runtime_checkable
+class Converter(Protocol):
+    """Protocol for converter classes."""
+
+    @staticmethod
+    def loads(value: Any) -> Any:
+        """Load a value."""
+        ...
+
+    @staticmethod
+    def dumps(value: Any) -> Any:
+        """Dump a value."""
+        ...
 
 
 class StringConverter:

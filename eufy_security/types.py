@@ -1,5 +1,8 @@
 """Define types."""
+from __future__ import annotations
+
 from enum import Enum
+from typing import Any, Union
 
 from .converters import (
     BoolConverter,
@@ -124,23 +127,27 @@ class ParamType(Enum):
     List retrieved from from com.oceanwing.battery.cam.binder.model.CameraParams
     """
 
-    def __new__(cls, value, converter=NumberConverter):
+    _converter_: Any  # Converter class or instance
+
+    def __new__(
+        cls, value: int, converter: Any = NumberConverter
+    ) -> "ParamType":
         """Create a new ParamType."""
         obj = object.__new__(cls)
         obj._value_ = value
         obj._converter_ = converter
         return obj
 
-    def loads(self, value):
+    def loads(self, value: Any) -> Any:
         """Read a parameter JSON string."""
         return self._converter_.loads(value)
 
-    def dumps(self, value):
+    def dumps(self, value: Any) -> Any:
         """Write a parameter JSON string."""
         return self._converter_.dumps(value)
 
     @staticmethod
-    def lookup(name_or_value):
+    def lookup(name_or_value: Union[ParamType, str, int]) -> "ParamType":
         """Look up a param type by its number or name."""
         if isinstance(name_or_value, ParamType):
             return name_or_value
