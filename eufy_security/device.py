@@ -1,177 +1,143 @@
-"""Define a Eufy device object."""
-import logging
-from typing import TYPE_CHECKING
+"""Data models for Eufy Security devices."""
 
-from .param import Params
-from .types import DeviceType, ParamType
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+from urllib.parse import quote as url_quote
+
+from .errors import EufySecurityError
 
 if TYPE_CHECKING:
-    from .api import API  # pylint: disable=cyclic-import
+    from .api import API
 
-_LOGGER: logging.Logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
-class Device:
-    """Define the device object."""
+@dataclass
+class Camera:
+    """Representation of a Eufy Security camera."""
 
-    def __init__(self, api: "API", device_info: dict) -> None:
-        """Initialize."""
-        self._api = api
-        self.device_info = {}
-        self.update(device_info)
-
-    def update(self, device_info: dict) -> None:
-        """Update the device's info."""
-        if isinstance(device_info, Device):
-            device_info = device_info.device_info
-        self.device_info.update(device_info)
-
-    @property
-    def type(self) -> DeviceType:
-        """Return the device's type."""
-        return DeviceType(self.device_info["device_type"])
-
-    @property
-    def is_camera(self) -> bool:
-        """Return whether device is a camera."""
-        return self.type.is_camera
-
-    @property
-    def is_station(self) -> bool:
-        """Return whether device is a station."""
-        return self.type.is_station
-
-    @property
-    def is_sensor(self) -> bool:
-        """Return whether device is a sensor."""
-        return self.type.is_sensor
-
-    @property
-    def is_doorbell(self) -> bool:
-        """Return whether device is a doorbell."""
-        return self.type.is_doorbell
+    api: API = field(repr=False)
+    camera_info: dict[str, Any] = field(repr=False)
+    # Separate storage for event-based data (thumbnail URL, etc.)
+    _event_data: dict[str, Any] = field(default_factory=dict, repr=False)
+    # RTSP credentials (set from config entry options)
+    rtsp_username: str | None = None
+    rtsp_password: str | None = None
 
     @property
     def serial(self) -> str:
-        """Return the device's serial number."""
-        return self.device_info["device_sn"]
+        """Return the camera serial number."""
+        return str(self.camera_info.get("device_sn", ""))
+
+    @property
+    def name(self) -> str:
+        """Return the camera name."""
+        return str(self.camera_info.get("device_name", "Unknown"))
+
+    @property
+    def model(self) -> str:
+        """Return the camera model."""
+        return str(self.camera_info.get("device_model", "Unknown"))
 
     @property
     def station_serial(self) -> str:
-        """Return the device's station serial number."""
-        return self.device_info["station_sn"]
-
-    @property
-    def software_version(self) -> str:
-        """Return the device's software version."""
-        return self.device_info["main_sw_version"]
+        """Return the station serial number."""
+        return str(self.camera_info.get("station_sn", ""))
 
     @property
     def hardware_version(self) -> str:
-        """Return the device's hardware version."""
-        return self.device_info["main_hw_version"]
+        """Return the hardware version."""
+        return str(self.camera_info.get("main_hw_version", ""))
 
     @property
-    def last_camera_image_url(self) -> str:
-        """Return the URL to the latest device thumbnail."""
-        return self.device_info["cover_path"]
+    def software_version(self) -> str:
+        """Return the software version."""
+        return str(self.camera_info.get("main_sw_version", ""))
 
     @property
-    def mac(self) -> str:
-        """Return the device MAC address."""
-        return self.device_info["wifi_mac"]
+    def ip_address(self) -> str | None:
+        """Return the local IP address of the camera."""
+        return self.camera_info.get("ip_addr") or None
 
     @property
-    def model(self) -> str:
-        """Return the device's model."""
-        return self.device_info["device_model"]
+    def last_camera_image_url(self) -> str | None:
+        """Return the URL to the latest camera thumbnail from events."""
+        # Try event-based thumbnail first, fall back to device info
+        return self._event_data.get("pic_url") or self.camera_info.get("cover_path")
 
-    @property
-    def name(self) -> str:
-        """Return the device name."""
-        return self.device_info["device_name"]
+    def update_event_data(self, event_data: dict[str, Any]) -> None:
+        """Update the camera with event data (thumbnail URL, etc.)."""
+        self._event_data = event_data
 
-    @property
-    def params(self) -> Params:
-        """Return device parameters."""
-        return Params(self.device_info["params"])
+    async def async_start_stream(self) -> str | None:
+        """Start the camera stream and return the RTSP URL.
 
-    async def async_set_params(self, params: dict) -> None:
-        """Set device parameters."""
-        await self._api.async_set_params(self, params)
+        Tries local RTSP first (if camera has RTSP enabled and credentials configured),
+        then falls back to cloud streaming.
+        """
+        # Try local RTSP if we have an IP address and credentials
+        # Eufy cameras with RTSP enabled use port 554 and path /live0
+        if self.ip_address and self.rtsp_username and self.rtsp_password:
+            # URL-encode credentials in case they contain special characters
+            username = url_quote(self.rtsp_username, safe="")
+            password = url_quote(self.rtsp_password, safe="")
+            rtsp_url = f"rtsp://{username}:{password}@{self.ip_address}:554/live0"
+            _LOGGER.debug(
+                "Camera %s local RTSP URL: rtsp://%s:***@%s:554/live0",
+                self.name,
+                self.rtsp_username,
+                self.ip_address,
+            )
+            return rtsp_url
 
-    async def async_start_detection(self):
-        """Start device detection."""
-        await self.async_set_params({ParamType.DETECT_SWITCH: 1})
+        if self.ip_address:
+            _LOGGER.debug(
+                "Camera %s has IP %s but RTSP credentials not configured. "
+                "Configure them in the integration options",
+                self.name,
+                self.ip_address,
+            )
 
-    async def async_start_stream(self) -> str:
-        """Start the device stream and return the RTSP URL."""
-        return await self._api.async_start_stream(self)
-
-    async def async_stop_detection(self):
-        """Stop device detection."""
-        await self.async_set_params({ParamType.DETECT_SWITCH: 0})
+        # Fall back to cloud streaming API
+        try:
+            resp = await self.api.request(
+                "post",
+                "v1/web/equipment/start_stream",
+                json={
+                    "device_sn": self.serial,
+                    "station_sn": self.station_serial,
+                    "proto": 2,
+                },
+            )
+            url = resp.get("data", {}).get("url")
+            return str(url) if url else None
+        except EufySecurityError as err:
+            _LOGGER.warning("Failed to start stream: %s", err)
+            return None
 
     async def async_stop_stream(self) -> None:
-        """Stop the device stream."""
-        await self._api.async_stop_stream(self)
-
-    async def async_update(self) -> None:
-        """Get the latest values for the device's properties."""
-        await self._api.async_update_device_info()
-
-
-class DeviceDict(dict):
-    """A dictionary of devices."""
-
-    _cls = Device
-
-    def __init__(self, api: "API"):
-        """Initialize DeviceDict."""
-        self._api = api
-
-    def update(self, device_infos):
-        """Update devices from a list of dictionary."""
-        if type(device_infos) == list:
-            devices = {}
-            for device_info in device_infos:
-                device = self._cls(self._api, device_info)
-                devices[device.serial] = device
-            device_infos = devices
-
-        if type(device_infos) != dict:
-            raise TypeError(type(device_infos))
-
-        for key, device_info in device_infos.items():
-            if key in self:
-                self[key].update(device_info)
-            else:
-                device = self._cls(self._api, device_info)
-                if device.serial != key:
-                    raise KeyError(key)
-                self[key] = device
+        """Stop the camera stream."""
+        try:
+            await self.api.request(
+                "post",
+                "v1/web/equipment/stop_stream",
+                json={
+                    "device_sn": self.serial,
+                    "station_sn": self.station_serial,
+                    "proto": 2,
+                },
+            )
+        except EufySecurityError as err:
+            _LOGGER.warning("Failed to stop stream: %s", err)
 
 
-class Station(Device):
-    """Define the station object."""
+@dataclass
+class Station:
+    """Representation of a Eufy Security station/hub."""
 
-    @property
-    def serial(self) -> str:
-        """Return the station's serial number."""
-        return self.station_serial
-
-    @property
-    def model(self) -> str:
-        """Return the station's model."""
-        return self.device_info["station_model"]
-
-    @property
-    def name(self) -> str:
-        """Return the station name."""
-        return self.device_info["station_name"]
-
-
-class StationDict(DeviceDict):
-    """A dictionary of stations."""
-
-    _cls = Station
+    serial: str
+    name: str
+    model: str
