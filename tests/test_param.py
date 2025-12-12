@@ -71,6 +71,14 @@ def test_param_value():
     assert param.value == 1234
 
 
+def test_param_value_zero():
+    """Test that param value of 0 is cached correctly (not re-parsed)."""
+    param = Param({"param_type": ParamType.CHIME_STATE.value, "param_value": "0",})
+    assert param.value == 0
+    # Access again to ensure cached value is returned
+    assert param.value == 0
+
+
 def test_param_set_value():
     """Test setting the param value."""
     param = Param({"param_type": ParamType.CHIME_STATE.value, "param_value": "1234",})

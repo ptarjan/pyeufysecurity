@@ -33,7 +33,12 @@ class Param:
 
     def __eq__(self, other: Any) -> bool:
         """Check whether the other object equals this object."""
-        return hash(self) == hash(other)
+        if not isinstance(other, Param):
+            return NotImplemented
+        try:
+            return self.type == other.type and self.id == other.id
+        except KeyError:
+            return self.type == other.type
 
     def __hash__(self) -> int:
         """Return a hash of the param."""
@@ -55,7 +60,7 @@ class Param:
     @property
     def value(self) -> Any:
         """Return the param value."""
-        if not self._value:
+        if self._value is None:
             self._value = self.type.loads(self.param_info["param_value"])
         return self._value
 

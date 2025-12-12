@@ -5,7 +5,7 @@ import base64
 from datetime import datetime, timezone
 from enum import Enum
 import json
-from typing import Any, Protocol, Type, Union, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -41,7 +41,7 @@ class NumberConverter:
     """Convert values to and from Number."""
 
     @staticmethod
-    def loads(value: str) -> Union[int, float]:
+    def loads(value: str) -> int | float:
         """Convert the value into a float or an integer."""
         if "." in str(value):
             return float(value)
@@ -49,7 +49,7 @@ class NumberConverter:
             return int(value)
 
     @staticmethod
-    def dumps(value: Union[int, float]) -> str:
+    def dumps(value: int | float) -> str:
         """Convert a float or integer into a string."""
         return str(value)
 
@@ -121,7 +121,7 @@ class DatetimeConverter:
 class EnumConverter:
     """Convert values to and from an enum."""
 
-    def __init__(self, enum: Type[Enum]):
+    def __init__(self, enum: type[Enum]):
         """Initialise converter with given enum."""
         self._enum = enum
 

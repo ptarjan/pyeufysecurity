@@ -5,7 +5,7 @@ Uses the v2 API with ECDH encryption, based on eufy-security-client by bropat.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json as json_module
 import logging
 import time
@@ -292,7 +292,9 @@ class API:
                 # Set token expiration
                 expires_at = auth_data.get("token_expires_at")
                 if expires_at:
-                    self._token_expiration = datetime.fromtimestamp(expires_at)
+                    self._token_expiration = datetime.fromtimestamp(
+                        expires_at, tz=timezone.utc
+                    )
 
                 # Update API base if different domain provided
                 domain = auth_data.get("domain")
@@ -465,7 +467,7 @@ class API:
         api_base = await self._async_get_api_base()
 
         # Check token expiration and refresh if needed
-        if self._token_expiration and datetime.now() >= self._token_expiration:
+        if self._token_expiration and datetime.now(timezone.utc) >= self._token_expiration:
             _LOGGER.info("Access token expired; fetching a new one")
             self._token = None
             self._token_expiration = None

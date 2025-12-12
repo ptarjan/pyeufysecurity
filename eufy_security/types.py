@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Union
+from typing import Any
 
 from .converters import (
     BoolConverter,
@@ -147,7 +147,7 @@ class ParamType(Enum):
         return self._converter_.dumps(value)
 
     @staticmethod
-    def lookup(name_or_value: Union[ParamType, str, int]) -> "ParamType":
+    def lookup(name_or_value: ParamType | str | int) -> "ParamType":
         """Look up a param type by its number or name."""
         if isinstance(name_or_value, ParamType):
             return name_or_value
