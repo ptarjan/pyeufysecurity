@@ -124,6 +124,64 @@ class API:
         if api_base:
             self._api_base = api_base
 
+    def get_session_state(self) -> dict[str, str | None]:
+        """Get the full session state for persistence.
+
+        Returns a dict containing token, token expiration, API base URL,
+        and ECDH crypto state. Store this opaquely and pass it back to
+        restore_session() to avoid re-authentication.
+        """
+        private_key_bytes = self._private_key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        return {
+            "token": self._token,
+            "token_expiration": (
+                self._token_expiration.isoformat() if self._token_expiration else None
+            ),
+            "api_base": self._api_base,
+            "private_key": private_key_bytes.hex(),
+            "server_public_key": self._server_public_key_hex or "",
+        }
+
+    def restore_session(self, state: dict[str, str | None]) -> bool:
+        """Restore a previous session from saved state.
+
+        Returns True if the session was fully restored (token + crypto),
+        False if state is missing/invalid. On failure, the API instance
+        is unchanged and you should call async_authenticate() instead.
+        """
+        token = state.get("token")
+        private_key_hex = state.get("private_key")
+        server_public_key_hex = state.get("server_public_key")
+
+        if not token or not private_key_hex or not server_public_key_hex:
+            return False
+
+        # Restore crypto state first
+        if not self.restore_crypto_state(private_key_hex, server_public_key_hex):
+            return False
+
+        # Restore token and API base
+        self._token = token
+        self._api_base = state.get("api_base")
+
+        # Parse token expiration
+        token_exp_str = state.get("token_expiration")
+        if token_exp_str:
+            try:
+                token_exp = datetime.fromisoformat(token_exp_str)
+                if token_exp.tzinfo is None:
+                    token_exp = token_exp.replace(tzinfo=timezone.utc)
+                self._token_expiration = token_exp
+            except ValueError:
+                pass
+
+        _LOGGER.debug("Restored session from saved state")
+        return True
+
     def get_crypto_state(self) -> dict[str, str]:
         """Get the ECDH crypto state for serialization.
 

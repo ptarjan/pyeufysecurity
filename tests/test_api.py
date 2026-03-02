@@ -268,6 +268,84 @@ class TestAPICryptoState:
         assert result is True
 
 
+class TestSessionState:
+    """Tests for API session state save/restore."""
+
+    def test_get_session_state(self):
+        """Test getting full session state."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        state = api.get_session_state()
+
+        assert "token" in state
+        assert "token_expiration" in state
+        assert "api_base" in state
+        assert "private_key" in state
+        assert "server_public_key" in state
+        assert state["token"] is None
+        assert state["api_base"] is None
+        assert len(state["private_key"]) > 0
+
+    def test_get_session_state_with_token(self):
+        """Test getting session state after token is set."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        expiration = datetime.now() + timedelta(days=1)
+        api.set_token("my-token", expiration, "https://api.eufy.com")
+
+        state = api.get_session_state()
+
+        assert state["token"] == "my-token"
+        assert state["api_base"] == "https://api.eufy.com"
+        assert state["token_expiration"] is not None
+
+    def test_restore_session_missing_token(self):
+        """Test restore_session returns False when token is missing."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        assert api.restore_session({}) is False
+        assert api.restore_session({"token": None}) is False
+
+    def test_restore_session_missing_crypto(self):
+        """Test restore_session returns False when crypto keys are missing."""
+        session = MagicMock()
+        api = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        assert api.restore_session({"token": "t", "private_key": "", "server_public_key": ""}) is False
+
+    def test_restore_session_roundtrip(self):
+        """Test save and restore session state roundtrip."""
+        session = MagicMock()
+        api1 = API(TEST_EMAIL, TEST_PASSWORD, session)
+
+        # Simulate a logged-in state
+        api1._token = "test-token"
+        api1._api_base = "https://api.eufy.com"
+        api1._token_expiration = datetime.now() + timedelta(days=1)
+        # Set a server public key so crypto state is complete
+        api1._server_public_key_hex = SERVER_PUBLIC_KEY.hex()
+        from cryptography.hazmat.primitives.asymmetric import ec
+        server_key = ec.EllipticCurvePublicKey.from_encoded_point(
+            ec.SECP256R1(), SERVER_PUBLIC_KEY
+        )
+        api1._response_shared_secret = api1._private_key.exchange(ec.ECDH(), server_key)
+
+        # Save state
+        state = api1.get_session_state()
+
+        # Restore into a new API instance
+        api2 = API(TEST_EMAIL, TEST_PASSWORD, session)
+        result = api2.restore_session(state)
+
+        assert result is True
+        assert api2.token == "test-token"
+        assert api2.api_base == "https://api.eufy.com"
+        assert api2.token_expiration is not None
+
+
 class TestCameraStreaming:
     """Tests for Camera streaming methods."""
 

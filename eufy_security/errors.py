@@ -34,7 +34,7 @@ class CaptchaRequiredError(EufySecurityError):
     def __init__(
         self,
         message: str,
-        captcha_id: str,
+        captcha_id: str = "",
         captcha_image: str | None = None,
         api: API | None = None,
     ) -> None:
@@ -98,6 +98,7 @@ ERRORS: dict[int, type[EufySecurityError]] = {
     26054: VerifyCodeNoneMatchError,
     26055: VerifyCodePasswordError,
     26058: PhoneNoneSupportError,
+    100032: CaptchaRequiredError,  # CAPTCHA verification required
     100033: InvalidCaptchaError,  # Wrong CAPTCHA answer
 }
 
